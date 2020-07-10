@@ -1,0 +1,33 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  CreateTask:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: main
+      MemorySize: 128
+      Runtime: go1.x
+      Code: 
+        S3Bucket: taskmanagerapp
+        S3Key: createTask.zip
+      Role: !GetAtt CreateTaskRole.Arn
+  CreateTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+              - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: CreateTaskPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: '*'
+                Resource: '*'

@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  GitHubOwner:
+    Description: GitHub repository Owner
+    Type: String
+  GitHubRepository:
+    Description: Name of the repository
+    Type: String
+  Branch:
+    Description: Name of the branch where source changes are to be detected
+    Type: String
+  OAuthToken:
+    Description: GitHub OAuthToekn
+    Type: String
+Resources:
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: taskmanagerapp-pipelineartifacts
+  DeployBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: taskmanagerapp-codebuilddeploybucket
+  TaskManagerPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Stages:
+        -
+          Name: Source
+          Actions:
+            - 
+              InputArtifacts: []
+              Name: ApplicationSource
+              ActionTypeId:
+                Version: '1'
+                Owner: ThirdParty
+                Category: Source
+                Provider: GitHub
+              RunOrder: 1
+              Configuration:
+                Owner: !Ref GitHubOwner
+                Repo: !Ref GitHubRepository
+                Branch: !Ref Branch
+                OAuthToken: !Ref OAuthToken
+              OutputArtifacts:
+                - 
+                  Name: SourceOutput
+        -
+          Name: Build
+          Actions:
+            -
+              Name: PackageExport
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              RunOrder: 1
+              Configuration:
+                ProjectName: !Ref CodeBuild
+              OutputArtifacts:
+                - Name: Pipeline-BuildArtifact
+              InputArtifacts:
+                - Name: SourceOutput
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      RoleArn: !GetAtt CodePipeLineRole.Arn
+  CodeBuild:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+        Name: MyProject
+      Description: Code Build for Task Manager App
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/golang:1.14
+        Type: LINUX_CONTAINER
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Source:
+        Type: CODEPIPELINE
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - "codebuild.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: /service-role/
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: Allow
+                Action:
+                  - "s3:GetObject"
+                  - "s3:GetObjectVersion"
+                  - "s3:GetBucketVersioning"
+                  - "s3:PutObject"
+                Resource: 
+                  - !GetAtt ArtifactBucket.Arn
+                  - !Join ['', [!GetAtt ArtifactBucket.Arn, "/*"]]
+              - 
+                Effect: Allow
+                Action:
+                  - "s3:GetObject"
+                  - "s3:GetObjectVersion"
+                  - "s3:GetBucketVersioning"
+                  - "s3:PutObject"
+                  - "s3:PutObjectAcl"
+                Resource: 
+                  - !GetAtt DeployBucket.Arn
+                  - !Join ['', [!GetAtt DeployBucket.Arn, "/*"]]
+              -
+                Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "cloudfront:CreateInvalidation"
+                Resource:
+                  - "*"
+  CodePipeLineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - "codepipeline.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: Allow
+                Action:
+                  - "s3:GetObject"
+                Resource:
+                  - "*"

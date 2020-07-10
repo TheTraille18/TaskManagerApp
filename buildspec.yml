@@ -1,0 +1,21 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      golang: 1.14
+    commands:
+      - echo "Running on Go"
+  pre_build:
+    commands:
+      - ls
+  build:
+    commands:
+      - echo Building *.go files
+      - cd createTask/
+      - go build
+  post_build:
+    commands:
+      - echo Sending to s3
+      - zip createTask.zip createTask 
+      - aws s3 cp createTask.zip s3://taskmanagerapp
