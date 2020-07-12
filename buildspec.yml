@@ -20,4 +20,4 @@ phases:
     commands:
       - echo Sending to s3
       - zip createTask.zip createTask 
-      - aws s3 cp createTask.zip s3://taskmanagerapp
+      - aws s3 cp createTask.zip s3://taskmanagerapp-codebuilddeploybucket
