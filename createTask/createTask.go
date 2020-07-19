@@ -52,9 +52,8 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	if len(ip) == 0 {
 		return events.APIGatewayProxyResponse{}, ErrNoIP
 	}
-	fmt.Println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! " + task.TaskName)
 	return events.APIGatewayProxyResponse{
-		Body:       fmt.Sprintf("Task Created!, %v", string(task.TaskName)),
+		Body:       "Task Created",
 		StatusCode: 200,
 	}, nil
 }
