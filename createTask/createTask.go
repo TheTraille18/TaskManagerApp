@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -29,8 +28,8 @@ var (
 )
 
 func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	fmt.Println("Creating Task...")
 	var task Task
-	fmt.Println("jfdsajfaoijiosjoiajfoaijjiodsjfiojeoij")
 	TaskBytes := []byte(string(request.Body))
 	err := json.Unmarshal(TaskBytes, &task)
 	if err != nil {
@@ -43,22 +42,16 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	if resp.StatusCode != 200 {
 		return events.APIGatewayProxyResponse{}, ErrNon200Response
 	}
-
-	ip, err := ioutil.ReadAll(resp.Body)
+	TaskJson, err := json.Marshal(task)
 	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
-
-	if len(ip) == 0 {
-		return events.APIGatewayProxyResponse{}, ErrNoIP
+		fmt.Println("Error")
 	}
 	return events.APIGatewayProxyResponse{
-		Body:       "Task Created",
+		Body:       string(TaskJson),
 		StatusCode: 200,
 	}, nil
 }
 
 func main() {
-	fmt.Println("Creating Task.....")
 	lambda.Start(handler)
 }
