@@ -1,15 +1,66 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Resources:
+  TaskManagerApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: TaskManagerapp-API
+  TaskManagerApiGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      ResourceId: !GetAtt TaskManagerApi.RootResourceId
+      RestApiId: !Ref TaskManagerApi
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub >-
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateTask.Arn}/invocations
+  TaskManagerApiGetMethodDeploy:
+    Type: AWS::ApiGateway::Deployment
+    Properties: 
+      RestApiId: !Ref TaskManagerApi
+      StageName: PROD
+  TaskManagerApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref TaskManagerApiGetMethodDeploy
+      RestApiId: !Ref TaskManagerApi
+  TasksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        -
+          AttributeName: User
+          AttributeType: S
+        -
+          AttributeName: DateCreated
+          AttributeType: S
+      KeySchema:
+        -
+          AttributeName: User
+          KeyType: HASH
+        -
+          AttributeName: DateCreated
+          KeyType: RANGE
+      BillingMode: PROVISIONED
+      ProvisionedThroughput:
+        ReadCapacityUnits: "1"
+        WriteCapacityUnits: "1"
+      TableName: TaskManagerApp-Tasks
+
   CreateTask:
     Type: AWS::Lambda::Function
     Properties:
-      Handler: main
+      FunctionName: TaskManagerApp-CreateTask
+      Handler: createTask
       MemorySize: 128
       Runtime: go1.x
       Code: 
-        S3Bucket: taskmanagerapp
+        S3Bucket: taskmanagerapp-deploybucket
         S3Key: createTask.zip
       Role: !GetAtt CreateTaskRole.Arn
+      
   CreateTaskRole:
     Type: AWS::IAM::Role
     Properties:
