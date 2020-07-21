@@ -65,9 +65,6 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		}, nil
 	}
 
-	if resp.StatusCode != 200 {
-		return events.APIGatewayProxyResponse{}, ErrNon200Response
-	}
 	TaskJSON, err := json.Marshal(task)
 	if err != nil {
 		fmt.Println("Error")
