@@ -2,9 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -15,8 +13,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
+//Task object
 type Task struct {
-	UserName    string `json:"User"`
+	User        string `json:"User"`
 	DateCreated string `json:"DateCreated"`
 	TaskName    string `json:"taskName"`
 	Description string `json:"description"`
@@ -24,19 +23,18 @@ type Task struct {
 }
 
 var (
-	// DefaultHTTPGetAddress Default Address
-	DefaultHTTPGetAddress = "https://checkip.amazonaws.com"
+	sess = session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	}))
 
-	// ErrNoIP No IP found in response
-	ErrNoIP = errors.New("No IP in HTTP response")
-
-	// ErrNon200Response non 200 status code in response
-	ErrNon200Response = errors.New("Non 200 Response found")
+	// Create DynamoDB client
+	svc = dynamodb.New(sess)
 )
 
 func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	fmt.Println("Creating Task...")
 	var task Task
+
 	TaskBytes := []byte(string(request.Body))
 	err := json.Unmarshal(TaskBytes, &task)
 	if err != nil {
@@ -45,12 +43,6 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 
 	task.DateCreated = time.Now().String()
 
-	sess := session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-
-	// Create DynamoDB client
-	svc := dynamodb.New(sess)
 	av, err := dynamodbattribute.MarshalMap(task)
 	if err != nil {
 		fmt.Println(err)
@@ -73,10 +65,6 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		}, nil
 	}
 
-	resp, err := http.Get(DefaultHTTPGetAddress)
-	if err != nil {
-		return events.APIGatewayProxyResponse{}, err
-	}
 	if resp.StatusCode != 200 {
 		return events.APIGatewayProxyResponse{}, ErrNon200Response
 	}
