@@ -38,6 +38,7 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	TaskBytes := []byte(string(request.Body))
 	err := json.Unmarshal(TaskBytes, &task)
 	if err != nil {
+		fmt.Println("Error in Unmarshal")
 		fmt.Println(err)
 	}
 
@@ -48,7 +49,7 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		fmt.Println(err)
 	}
 
-	tableName := "Tasks"
+	tableName := "TaskManagerApp-Tasks"
 
 	input := &dynamodb.PutItemInput{
 		Item:      av,
