@@ -70,11 +70,11 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	if err != nil {
 		fmt.Println("Error")
 	}
-	headers := make({string}string)
-	headers["Access-Control-Allow-Origin" : "*"]
-	headers["Access-Control-Allow-Credentials" : "true"]
+	headers := make(map[string]string)
+	headers["Access-Control-Allow-Origin"] = "*"
+	headers["Access-Control-Allow-Credentials"] = "true"
 	return events.APIGatewayProxyResponse{
-		Headers: headers,
+		Headers:    headers,
 		Body:       string(TaskJSON),
 		StatusCode: 200,
 	}, nil
