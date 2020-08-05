@@ -7,3 +7,4 @@ getUserTasks/go.mod
 getUserTasks/go.sum
 getUserTasks/getUserTasks
 getUserTasks/getUserTasks.zip
+Makefile
