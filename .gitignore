@@ -2,3 +2,8 @@ TaskManagerApp-Test/
 createTask/go.mod
 createTask/go.sum
 createTask/createTask
+createTask/createTask.zip
+getUserTasks/go.mod
+getUserTasks/go.sum
+getUserTasks/getUserTasks
+getUserTasks/getUserTasks.zip
