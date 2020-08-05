@@ -16,8 +16,14 @@ phases:
       - echo Building *.go files
       - cd createTask/
       - go build
+      - cd ..
+      - cd getUserTasks/
+      - go build
+      - cd ..
   post_build:
     commands:
       - echo Sending to s3
-      - zip createTask.zip createTask 
-      - aws s3 cp createTask.zip s3://taskmanagerapp-deploybucket
+      - zip createTask/createTask.zip createTask/createTask
+      - aws s3 cp createTask/createTask.zip s3://taskmanagerapp-deploybucket
+      - zip getUserTasks/getUserTasks.zip getUserTasks/getUserTasks
+      - aws s3 cp getUserTasks/getUserTasks.zip s3://taskmanagerapp-deploybucket
