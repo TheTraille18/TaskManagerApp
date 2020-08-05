@@ -32,8 +32,10 @@ var (
 )
 
 func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	fmt.Println("Creating Task...")
+	fmt.Println("Task...")
 	var task Task
+	fmt.Println("Request: ")
+	fmt.Println(request.Body)
 
 	TaskBytes := []byte(string(request.Body))
 	err := json.Unmarshal(TaskBytes, &task)
@@ -55,12 +57,18 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		Item:      av,
 		TableName: aws.String(tableName),
 	}
+	headers := make(map[string]string)
+	headers["Access-Control-Allow-Origin"] = "*"
+	headers["Access-Control-Allow-Headers"] = "*"
+	headers["Access-Control-Allow-Credentials"] = "true"
 
+	fmt.Println("Writting Item to Table")
 	_, err = svc.PutItem(input)
 	if err != nil {
 		fmt.Println("Got error in Put item")
 		fmt.Println(err)
 		return events.APIGatewayProxyResponse{
+			Headers:    headers,
 			Body:       string("Put Item Error"),
 			StatusCode: 502,
 		}, nil
@@ -70,9 +78,7 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	if err != nil {
 		fmt.Println("Error")
 	}
-	headers := make(map[string]string)
-	headers["Access-Control-Allow-Origin"] = "*"
-	headers["Access-Control-Allow-Credentials"] = "true"
+	fmt.Println("Returning Response")
 	return events.APIGatewayProxyResponse{
 		Headers:    headers,
 		Body:       string(TaskJSON),
