@@ -1,15 +1,84 @@
 AWSTemplateFormatVersion: "2010-09-09"
+Parameters:
+  TaskManagerAppCognitoArn:
+    Description: Cognito Arn
+    Type: String
 Resources:
+  AppsyncDynamoDBRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+              - appsync.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: CreateTaskPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                Resource: '*'
+
   TaskManagerApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: TaskManagerapp-API
-  TaskManagerApiGetMethod:
+  TaskManagerApiAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: TaskManagerApiAuth
+      ProviderARNs: 
+        - !Ref TaskManagerAppCognitoArn
+      IdentitySource: method.request.header.Auth
+      RestApiId: !Ref TaskManagerApi
+      Type: COGNITO_USER_POOLS
+  TaskManagerApiCreateTaskResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+        ParentId: !GetAtt TaskManagerApi.RootResourceId
+        PathPart: createtask
+        RestApiId: !Ref TaskManagerApi
+  TaskManagerApiGetUserTasksResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+        ParentId: !GetAtt TaskManagerApi.RootResourceId
+        PathPart: getusertasks
+        RestApiId: !Ref TaskManagerApi
+  TaskManagetApiGetUserTasksMethod:
     Type: AWS::ApiGateway::Method
     Properties:
-      AuthorizationType: NONE
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TaskManagerApiAuthorizer
+      HttpMethod: GET
+      ResourceId: !Ref TaskManagerApiGetUserTasksResource
+      RestApiId: !Ref TaskManagerApi
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub >-
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetUserTasks.Arn}/invocations
+  TaskManagerApiCreateTaskMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TaskManagerApiAuthorizer
       HttpMethod: POST
-      ResourceId: !GetAtt TaskManagerApi.RootResourceId
+      ResourceId: !Ref TaskManagerApiCreateTaskResource
       RestApiId: !Ref TaskManagerApi
       Integration:
         Type: AWS_PROXY
@@ -26,6 +95,7 @@ Resources:
     Properties:
       DeploymentId: !Ref TaskManagerApiGetMethodDeploy
       RestApiId: !Ref TaskManagerApi
+
   TasksTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -48,6 +118,61 @@ Resources:
         ReadCapacityUnits: "1"
         WriteCapacityUnits: "1"
       TableName: TaskManagerApp-Tasks
+  
+  TaskSyncApi:
+    Type: AWS::AppSync::GraphQLApi
+    Properties:
+      AuthenticationType: AMAZON_COGNITO_USER_POOLS
+      Name: TaskManagerAppApi
+      UserPoolConfig:
+        AwsRegion: us-east-1
+        DefaultAction: ALLOW
+        UserPoolId: us-east-1_EGoblayO8
+  TaskSyncSchema:
+    Type: AWS::AppSync::GraphQLSchema
+    Properties:
+      ApiId: !GetAtt TaskSyncApi.ApiId
+      Definition: |
+        type Task {
+          User: ID!
+          DateCreated: String
+          TaskName: String
+          TaskRunTime: String
+        }
+        type Query {
+          getTask(User: ID!): Task
+        }
+        type Schema {
+          query: Query
+        }
+  TaskManagerAppDataSource:
+    Type: AWS::AppSync::DataSource
+    Properties:
+      ApiId: !GetAtt TaskSyncApi.ApiId
+      DynamoDBConfig:
+        AwsRegion: us-east-1
+        TableName: TaskManagerApp-Tasks
+      Name: TaskManagerApp_Resolver
+      ServiceRoleArn: !GetAtt AppsyncDynamoDBRole.Arn
+      Type: AMAZON_DYNAMODB
+
+  TaskManagerAppGetTaskResolver:
+    Type: AWS::AppSync::Resolver
+    Properties:
+      ApiId: !GetAtt TaskSyncApi.ApiId
+      DataSourceName: !GetAtt TaskManagerAppDataSource.Name
+      FieldName: getTask
+      TypeName: Query
+      RequestMappingTemplate: |
+        {
+          "version": "2017-02-28",
+          "operation": "GetItem",
+          "key": {
+            "User": $util.dynamodb.toDynamoDBJson($ctx.args.User),
+            "DateCreated": $util.dynamodb.toDynamoDBJson($ctx.args.DateCreated),
+          }
+        }
+      ResponseMappingTemplate: "$util.toJson($ctx.result)"
 
   CreateTask:
     Type: AWS::Lambda::Function
@@ -59,8 +184,7 @@ Resources:
       Code: 
         S3Bucket: taskmanagerapp-deploybucket
         S3Key: createTask.zip
-      Role: !GetAtt CreateTaskRole.Arn
-      
+      Role: !GetAtt CreateTaskRole.Arn 
   CreateTaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -80,5 +204,60 @@ Resources:
             Version: 2012-10-17
             Statement:
               - Effect: Allow
-                Action: '*'
-                Resource: '*'
+                Action:
+                  - dynamodb:PutItem
+                Resource: !GetAtt TasksTable.Arn
+        - PolicyName: CreateTaskLogPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+  
+  GetUserTasks:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: TaskManagerApp-GetUserTasks
+      Handler: getUserTasks
+      MemorySize: 128
+      Runtime: go1.x
+      Code: 
+        S3Bucket: taskmanagerapp-deploybucket
+        S3Key: getUserTasks.zip
+      Role: !GetAtt GetUserTaskRole.Arn 
+  GetUserTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+              - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: GetUserTasksPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                Resource: !GetAtt  TasksTable.Arn
+        - PolicyName: GetUserTasksLogPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
