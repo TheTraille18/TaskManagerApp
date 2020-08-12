@@ -21,8 +21,8 @@ var (
 )
 
 type Task struct {
-	User        string `json:"User"`
-	DateCreated string `json:"DateCreated"`
+	User     string `json:"User"`
+	TaskName string `json:"TaskName"`
 }
 
 func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -47,8 +47,8 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 			"User": {
 				S: aws.String(task.User),
 			},
-			"DateCreated": {
-				S: aws.String(task.DateCreated),
+			"TaskName": {
+				S: aws.String(task.TaskName),
 			},
 		},
 		TableName: aws.String(tableName),
