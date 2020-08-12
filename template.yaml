@@ -59,6 +59,12 @@ Resources:
         ParentId: !GetAtt TaskManagerApi.RootResourceId
         PathPart: getusertasks
         RestApiId: !Ref TaskManagerApi
+  TaskManagerApiDeleteTaskResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+        ParentId: !GetAtt TaskManagerApi.RootResourceId
+        PathPart: deletetask
+        RestApiId: !Ref TaskManagerApi
   TaskManagetApiGetUserTasksMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -85,6 +91,19 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub >-
           arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateTask.Arn}/invocations
+  TaskManagerApiDeleteTaskMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref TaskManagerApiAuthorizer
+      HttpMethod: POST
+      ResourceId: !Ref TaskManagerApiDeleteTaskResource
+      RestApiId: !Ref TaskManagerApi
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub >-
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${DeleteTask.Arn}/invocations
   TaskManagerApiGetMethodDeploy:
     Type: AWS::ApiGateway::Deployment
     Properties: 
@@ -96,7 +115,7 @@ Resources:
       DeploymentId: !Ref TaskManagerApiGetMethodDeploy
       RestApiId: !Ref TaskManagerApi
 
-  TasksTable:
+  TaskManagerTasks:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
@@ -104,14 +123,14 @@ Resources:
           AttributeName: User
           AttributeType: S
         -
-          AttributeName: DateCreated
+          AttributeName: TaskName
           AttributeType: S
       KeySchema:
         -
           AttributeName: User
           KeyType: HASH
         -
-          AttributeName: DateCreated
+          AttributeName: TaskName
           KeyType: RANGE
       BillingMode: PROVISIONED
       ProvisionedThroughput:
@@ -206,7 +225,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - dynamodb:PutItem
-                Resource: !GetAtt TasksTable.Arn
+                Resource: !GetAtt TaskManagerTasks.Arn
         - PolicyName: CreateTaskLogPolicy
           PolicyDocument:
             Version: 2012-10-17
@@ -216,6 +235,14 @@ Resources:
                   - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
+                Resource: "*"
+        - PolicyName: CreateTaskStateMachinePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - states:StartExecution
                 Resource: "*"
   
   GetUserTasks:
@@ -250,8 +277,143 @@ Resources:
               - Effect: Allow
                 Action:
                   - dynamodb:Query
-                Resource: !GetAtt  TasksTable.Arn
+                Resource: !GetAtt TaskManagerTasks.Arn
         - PolicyName: GetUserTasksLogPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+    
+  DeleteTask:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: TaskManagerApp-DeleteTask
+      Handler: deleteUserTask
+      MemorySize: 128
+      Runtime: go1.x
+      Code: 
+        S3Bucket: taskmanagerapp-deploybucket
+        S3Key: deleteUserTask.zip
+      Role: !GetAtt DeleteTaskRole.Arn 
+  DeleteTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+              - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: DeleteTaskPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt TaskManagerTasks.Arn
+        - PolicyName: DeleteTaskLogPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+  UpdateTaskStatus:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: TaskManagerApp-UpdateTask
+      Handler: updateTaskStatus
+      MemorySize: 128
+      Runtime: go1.x
+      Code: 
+        S3Bucket: taskmanagerapp-deploybucket
+        S3Key: updateTaskStatus.zip
+      Role: !GetAtt UpdateTaskStatusRole.Arn 
+  UpdateTaskStatusRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+              - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: UpdateTaskStatusPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt TaskManagerTasks.Arn
+        - PolicyName: UpdateTaskStatusLogPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+  TaskManagerStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      DefinitionS3Location:
+        Bucket: taskmanagerapp-deploybucket
+        Key: taskmanager_statemachine.json
+      RoleArn: !GetAtt TaskManagerStepRole.Arn
+      StateMachineName: TaskManager-StateMachine
+  TaskManagerStepRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+              - states.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: StateMachineInvokeLambdaPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt UpdateTaskStatus.Arn
+        - PolicyName: GetStateMachinePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:  "*"
+        - PolicyName: StepTaskLogPolicy
           PolicyDocument:
             Version: 2012-10-17
             Statement:
