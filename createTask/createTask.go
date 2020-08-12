@@ -11,25 +11,62 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
+	"github.com/aws/aws-sdk-go/service/sfn"
 )
 
 //Task object
 type Task struct {
 	User        string `json:"User"`
+	TaskName    string `json:"TaskName"`
 	DateCreated string `json:"DateCreated"`
-	TaskName    string `json:"taskName"`
 	Description string `json:"description"`
 	TaskRunTime string `json:"taskRunTime"`
+	Status      string `json:"TaskStatus"`
+}
+
+type RunningTask struct {
+	User        string `json:"User"`
+	TaskName    string `json:"TaskName"`
+	TaskRunTime string `json:"TaskRunTime"`
 }
 
 var (
+	// Create DynamoDB client
 	sess = session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
 	}))
-
-	// Create DynamoDB client
 	svc = dynamodb.New(sess)
+
+	//Create Step Function client
+	sessStep = session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	}))
+	stepSvc = sfn.New(sessStep)
 )
+
+//RunTask  State Step Function
+func RunTask(t Task) {
+	runTask := RunningTask{
+		User:        t.User,
+		TaskRunTime: t.TaskRunTime,
+		TaskName:    t.TaskName,
+	}
+	TaskJson, err := json.Marshal(runTask)
+	if err != nil {
+		fmt.Println("Error Marshaling")
+		fmt.Println(err)
+	}
+	sfnInput := &sfn.StartExecutionInput{
+		Input:           aws.String(string(TaskJson)),
+		StateMachineArn: aws.String("arn:aws:states:us-east-1:398080922284:stateMachine:TaskManager-StateMachine"),
+	}
+	fmt.Println("Start Execution")
+	_, err = stepSvc.StartExecution(sfnInput)
+	if err != nil {
+		fmt.Println("Error staring execution")
+		fmt.Println(err)
+	}
+}
 
 func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	fmt.Println("Task...")
@@ -43,8 +80,9 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		fmt.Println("Error in Unmarshal")
 		fmt.Println(err)
 	}
-
+	RunTask(task)
 	task.DateCreated = time.Now().String()
+	task.Status = "Active"
 
 	av, err := dynamodbattribute.MarshalMap(task)
 	if err != nil {
