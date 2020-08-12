@@ -1,0 +1,26 @@
+{
+  "Comment": "An example of the Amazon States Language for scheduling a task.",
+  "StartAt": "TaskActive",
+  "States": {
+    "TaskActive": {
+      "Type": "Wait",
+      "SecondsPath": "$.TaskRunTime",
+      "Next": "TaskInactive"
+    },
+    "TaskInactive": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:398080922284:function:TaskManagerApp-UpdateTask",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "End": true
+    }
+  }
+}
