@@ -13,12 +13,12 @@ import (
 
 //Task Item
 type Task struct {
-	User        string `json:'User'`
-	Description string `json:'description'`
-	DateCreated string `json:'DateCreated'`
-	TaskName    string `json:'taskName'`
-	TaskRunTime string `json:'taskRunTime'`
-	Status      string `json:'Status'`
+	User        string `json:"User"`
+	Description string `json:"description"`
+	DateCreated string `json:"DateCreated"`
+	TaskName    string `json:"taskName"`
+	TaskRunTime string `json:"taskRunTime"`
+	Status      string `json:"Status"`
 }
 
 var (
