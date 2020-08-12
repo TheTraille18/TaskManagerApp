@@ -7,4 +7,10 @@ getUserTasks/go.mod
 getUserTasks/go.sum
 getUserTasks/getUserTasks
 getUserTasks/getUserTasks.zip
+deleteUserTask/deleteUserTask
+deleteUserTask/deleteUserTask.zip
+updateTaskStatus/go.mod
+updateTaskStatus/go.sum
+updateTaskStatus/updateTaskStatus
+updateTaskStatus/updateTaskStatus.zip
 Makefile

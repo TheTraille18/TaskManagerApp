@@ -18,6 +18,7 @@ type Task struct {
 	DateCreated string `json:'DateCreated'`
 	TaskName    string `json:'taskName'`
 	TaskRunTime string `json:'taskRunTime'`
+	Status      string `json:'Status'`
 }
 
 var (
@@ -63,10 +64,11 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 	Tasks := make([]Task, 0)
 	for _, taskItem := range taskQuery.Items {
 		user := taskItem["User"]
+		taskName := taskItem["TaskName"]
 		dateCreated := taskItem["DateCreated"]
 		description := taskItem["description"]
-		taskName := taskItem["taskName"]
 		taskRunTime := taskItem["taskRunTime"]
+		status := taskItem["TaskStatus"]
 
 		task := Task{
 			User:        *user.S,
@@ -74,6 +76,7 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 			Description: *description.S,
 			TaskName:    *taskName.S,
 			TaskRunTime: *taskRunTime.S,
+			Status:      *status.S,
 		}
 		Tasks = append(Tasks, task)
 	}
